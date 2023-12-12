@@ -5,10 +5,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import * as u8a from "uint8arrays";
-import { hash } from "@stablelib/sha256";
 import { useWalletClient } from "wagmi";
-import { EthereumAuthProvider } from "@ceramicnetwork/blockchain-utils-linking";
 import { DIDSession } from "did-session";
 import { EthereumWebAuth, getAccountId } from "@didtools/pkh-ethereum";
 import { RuntimeCompositeDefinition } from "@composedb/types";
@@ -16,9 +13,6 @@ import { CeramicClient } from "@ceramicnetwork/http-client";
 import { ComposeClient } from "@composedb/client";
 import { definition } from "../__generated__/definition";
 import { GetWalletClientResult } from "@wagmi/core";
-import {DID } from "dids";
-import { Ed25519Provider } from "key-did-provider-ed25519";
-import KeyResolver from "key-did-resolver";
 
 type ComposeDBProps = {
   children: ReactNode;
