@@ -4,16 +4,13 @@ import { GraphiQL } from "graphiql";
 import { ComposeClient } from "@composedb/client";
 import { RuntimeCompositeDefinition } from "@composedb/types";
 import { definition } from "../__generated__/definition.js";
-import { getEthTypesFromInputDoc } from "eip-712-types-generation";
-import { CredentialPayload } from "@veramo/core";
 import KeyResolver from "key-did-resolver";
-import {
-  processEntryToArray,
-  MANDATORY_CREDENTIAL_CONTEXT,
-} from "@veramo/utils";
+import { DagJWS } from "dids";
 import "graphiql/graphiql.min.css";
 import { useComposeDB } from "../fragments/index";
 import { DID } from "dids";
+import { CeramicClient } from "@ceramicnetwork/http-client";
+import CID from "cids";
 
 enum ClaimTypes {
   verifiableCredential = "verifiableCredential",
@@ -36,40 +33,6 @@ export default function Create() {
   const [queries, setQueries] = useState<Queries>({
     values: [
       {
-        query: `query VerifiableCredentials {
-          verifiableClaimIndex(last: 1) {
-            edges {
-              node {
-                recipient {
-                  id
-                }
-                controller {
-                  id
-                }
-                ... on VerifiableCredential {
-                  expirationDate
-                  context
-                  ... on VCEIP712Proof {
-                    proof {
-                      created
-                    }
-                    ... on AccountTrustCredential712 {
-                      trusted
-                    }
-                  }
-                  ... on VCJWTProof {
-                    proof {
-                      type
-                      jwt
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }`,
-      },
-      {
         query: `query BaseCredentials{
         trustIndex(last: 1){
           edges{
@@ -86,7 +49,10 @@ export default function Create() {
           }
         }
       }`,
-      }, // Add an empty query object to fix the type error
+      },
+      {
+        query: "",
+      },
     ],
   });
 
@@ -158,11 +124,14 @@ export default function Create() {
               }
               trusted
               jwt
+              id
             }
           }
         }
-      }`);
-    if(credential.data.trustIndex !== null){
+      }`
+    );
+    if (credential.data.trustIndex.edges.length > 0) {
+      //obtain did:key used to sign the credential
       const credentialToValidate = credential.data.trustIndex.edges[0].node.jwt;
       const json = Buffer.from(credentialToValidate, "base64").toString();
       const parsed = JSON.parse(json);
@@ -170,327 +139,35 @@ export default function Create() {
       //@ts-ignore
       const newDid = new DID({ resolver: KeyResolver.getResolver() });
       const result = await newDid.verifyJWS(parsed);
-      console.log(result);
+      const didFromJwt = result.didResolutionResult?.didDocument?.id;
+
+      //obtain did:key used to authorize the did-session
+      const stream = credential.data.trustIndex.edges[0].node.id;
+      const ceramic = new CeramicClient("http://localhost:7007");
+      const streamData = await ceramic.loadStreamCommits(stream);
+      const cid: CID | undefined = streamData[0] as CID;
+      //@ts-ignore
+      const cidString = cid?.cid;
+      const url = `http://localhost:5001/api/v0/dag/get?arg=${cidString}&output-codec=dag-json`;
+      const data = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const toJson: DagJWS = await data.json();
+      const res = await newDid.verifyJWS(toJson);
+      const didFromDag = res.didResolutionResult?.didDocument?.id;
+      console.log(didFromJwt, didFromDag);
+      if (didFromJwt === didFromDag) {
+        console.log("Valid");
+      } else {
+        console.log("Invalid");
+      }
     }
-  };
-
-  const saveCredential = async (credential: any) => {
-    console.log(credential);
-    const data: any = await compose.executeQuery(`
-      mutation {
-        createAccountTrustCredential712(input: {
-          content: {
-              context: ${JSON.stringify(credential["@context"]).replace(
-                /"([^"]+)":/g,
-                "$1:"
-              )}
-              issuer: {
-                id: "${credential.issuer}"
-              }
-              recipient: "${credential.credentialSubject.id}"  
-              trusted: ${credential.credentialSubject.isTrusted}
-              type: ${JSON.stringify(credential.type).replace(
-                /"([^"]+)":/g,
-                "$1:"
-              )}
-              credentialSchema: ${JSON.stringify(
-                credential.credentialSchema
-              ).replace(/"([^"]+)":/g, "$1:")}
-              issuanceDate: "${credential.issuanceDate}"
-              credentialSubject: ${JSON.stringify(credential.credentialSubject)
-                .replace(/"([^"]+)":/g, "$1:")
-                .replace("isTrusted", "trusted")}
-                proof: {
-                  proofPurpose: "${credential.proof.proofPurpose}"
-                  type: "${credential.proof.type}"
-                  created: "${credential.proof.created}"
-                  verificationMethod: "${credential.proof.verificationMethod}"
-                  proofValue: "${credential.proof.proofValue}"
-                  eip712: {
-                    domain: ${JSON.stringify(
-                      credential.proof.eip712.domain
-                    ).replace(/"([^"]+)":/g, "$1:")}
-                    types: ${JSON.stringify(
-                      credential.proof.eip712.types
-                    ).replace(/"([^"]+)":/g, "$1:")}
-                    primaryType: "${credential.proof.eip712.primaryType}"
-                  }
-                }
-            }
-        }) 
-        {
-          document {
-            id
-            issuer {
-              id
-            }
-            issuanceDate
-            type
-            context
-            credentialSubject{
-              id {
-                id
-              }
-              trusted
-            }
-            proof{
-              type
-              proofPurpose
-              verificationMethod
-              proofValue
-              created
-              eip712{
-                domain{
-                  name
-                  version
-                  chainId
-                }
-                types {
-                  EIP712Domain {
-                    name
-                    type
-                  }
-                  CredentialSchema {
-                    name
-                    type
-                  }
-                  CredentialSubject {
-                    name
-                    type
-                  }
-                  Proof {
-                    name
-                    type
-                  }
-                  VerifiableCredential {
-                    name
-                    type
-                  }
-                }
-                primaryType
-              }
-            }
-          }
-        }
-      }
-    `);
-    console.log(data);
-  };
-
-  const saveJwt = async (credential: any) => {
-    const data: any = await compose.executeQuery(`
-      mutation {
-        createAccountTrustCredentialJWT(input: {
-          content: {
-              context: ${JSON.stringify(credential["@context"]).replace(
-                /"([^"]+)":/g,
-                "$1:"
-              )}
-              issuer: {
-                id: "${credential.issuer}"
-              }
-              recipient: "${credential.credentialSubject.id}"  
-              trusted: ${credential.credentialSubject.isTrusted}
-              type: ${JSON.stringify(credential.type).replace(
-                /"([^"]+)":/g,
-                "$1:"
-              )}
-              credentialSchema: ${JSON.stringify(
-                credential.credentialSchema
-              ).replace(/"([^"]+)":/g, "$1:")}
-              issuanceDate: "${credential.issuanceDate}"
-              credentialSubject: ${JSON.stringify(credential.credentialSubject)
-                .replace(/"([^"]+)":/g, "$1:")
-                .replace("isTrusted", "trusted")}
-                proof: {
-                  type: "${credential.proof.type}"
-                  jwt: "${credential.proof.jwt}"
-                }
-            }
-        }) 
-        {
-          document {
-            id
-            issuer {
-              id
-            }
-            issuanceDate
-            type
-            context
-            credentialSubject{
-              id {
-                id
-              }
-              trusted
-            }
-            proof{
-              type
-              jwt
-            }
-          }
-        }
-      }
-    `);
-    console.log(data);
-  };
-
-  const create712Credential = async () => {
-    const id = localStorage.getItem("did");
-    if (!id) return;
-
-    const cred = {
-      issuer: id,
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://beta.api.schemas.serto.id/v1/public/trusted-reviewer/1.0/ld-context.json",
-      ],
-      type: ["VerifiableCredential", "Trusted"],
-      credentialSchema: {
-        id: "https://beta.api.schemas.serto.id/v1/public/trusted/1.0/json-schema.json",
-        type: "JsonSchemaValidator2018",
-      },
-      credentialSubject: {
-        isTrusted: true,
-        id: `did:pkh:eip155:1:${destination.toLowerCase()}`,
-      },
-    };
-    const credentialContext = processEntryToArray(
-      cred?.["@context"],
-      MANDATORY_CREDENTIAL_CONTEXT
-    );
-    const credentialType = processEntryToArray(
-      cred?.type,
-      "VerifiableCredential"
-    );
-    //@ts-ignore
-    let chainId = 1;
-    let issuanceDate = new Date().toISOString();
-
-    const credFinal: CredentialPayload = {
-      ...cred,
-      "@context": credentialContext,
-      type: credentialType,
-      issuanceDate,
-      proof: {
-        verificationMethod: localStorage.getItem("did"),
-        created: issuanceDate,
-        proofPurpose: "assertionMethod",
-        type: "EthereumEip712Signature2021",
-      },
-    };
-    const message = credFinal;
-    const domain = {
-      chainId,
-      name: "VerifiableCredential",
-      version: "1",
-    };
-    const primaryType = "VerifiableCredential";
-    const allTypes = getEthTypesFromInputDoc(credFinal, primaryType);
-    const types = { ...allTypes };
-
-    //@ts-ignore
-    const jws = await keySession.did.createJWS({
-      domain,
-      types,
-      message,
-      primaryType,
-    });
-    const jwsJsonStr = JSON.stringify(jws);
-    const jwsJsonB64 = Buffer.from(jwsJsonStr).toString("base64");
-    credFinal["proof"]["proofValue"] = jwsJsonB64;
-    credFinal["proof"]["eip712"] = {
-      domain,
-      types: allTypes,
-      primaryType,
-    };
-    console.log(credFinal);
-    saveCredential(credFinal);
-    // const newDid = new DID({ resolver: KeyResolver.getResolver() });
-    // const result = await newDid.verifyJWS(jws);
-    // const parentDid = keySession?.did._parentId;
-  };
-
-  const createJwtCredential = async () => {
-    const id = localStorage.getItem("did");
-    if (!id) return;
-
-    const cred = {
-      issuer: id,
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://beta.api.schemas.serto.id/v1/public/trusted-reviewer/1.0/ld-context.json",
-      ],
-      type: ["VerifiableCredential", "Trusted"],
-      credentialSchema: {
-        id: "https://beta.api.schemas.serto.id/v1/public/trusted/1.0/json-schema.json",
-        type: "JsonSchemaValidator2018",
-      },
-      credentialSubject: {
-        isTrusted: true,
-        id: `did:pkh:eip155:1:${destination.toLowerCase()}`,
-      },
-    };
-    const credentialContext = processEntryToArray(
-      cred?.["@context"],
-      MANDATORY_CREDENTIAL_CONTEXT
-    );
-    const credentialType = processEntryToArray(
-      cred?.type,
-      "VerifiableCredential"
-    );
-    //@ts-ignore
-    let chainId = 1;
-    let issuanceDate = new Date().toISOString();
-
-    const credFinal: CredentialPayload = {
-      ...cred,
-      "@context": credentialContext,
-      type: credentialType,
-      issuanceDate,
-      proof: {
-        verificationMethod: localStorage.getItem("did"),
-        created: issuanceDate,
-        proofPurpose: "assertionMethod",
-        type: "JwtProof2020",
-      },
-    };
-    const message = credFinal;
-    const domain = {
-      chainId,
-      name: "VerifiableCredential",
-      version: "1",
-    };
-    const primaryType = "VerifiableCredential";
-    const allTypes = getEthTypesFromInputDoc(credFinal, primaryType);
-    const types = { ...allTypes };
-    //const data = JSON.stringify({ domain, types, message, primaryType });
-    // const provider = ethers.providers.getDefaultProvider("mainnet");
-    // const signer = new ethers.Wallet(keySeed, provider);
-
-    //@ts-ignore
-    const jws = await keySession.did.createJWS({
-      domain,
-      types,
-      message,
-      primaryType,
-    });
-    const jwsJsonStr = JSON.stringify(jws);
-    const jwsJsonB64 = Buffer.from(jwsJsonStr).toString("base64");
-    credFinal["proof"]["jwt"] = jwsJsonB64;
-    console.log(credFinal);
-    saveJwt(credFinal);
   };
 
   const createClaim = async () => {
-    if (claim === ("verifiableCredential" as ClaimTypes)) {
-      if (signature === "EIP712") {
-        const credential = await create712Credential();
-        console.log(credential);
-      } else {
-        const credential = await createJwtCredential();
-        console.log(credential);
-      }
-    }
     if (claim === ("baseCredential" as ClaimTypes)) {
       await saveBaseCredential();
     }
@@ -499,6 +176,7 @@ export default function Create() {
   useEffect(() => {
     if (address) {
       setLoggedIn(true);
+      validateBaseCredential();
     }
   }, [address]);
 
@@ -531,7 +209,7 @@ export default function Create() {
                 onChange={(e) => setDestination(e.target.value.toLowerCase())}
               />
             </div>
-            <div>Select claim format</div>
+            <div>Claim format: </div>
             <form className="px-4 py-3 m-3">
               <select
                 className="text-center"
@@ -540,14 +218,10 @@ export default function Create() {
                 }
                 value={claim}
               >
-                <option value="verifiableCredential">
-                  Verifiable Credential
-                </option>
                 <option value="baseCredential">Base Credential</option>
               </select>
             </form>
-
-            {claim === "verifiableCredential" && (
+            {/* {claim === "verifiableCredential" && (
               <>
                 <div>Select a signature format</div>
                 <form className="px-4 py-3 m-3">
@@ -565,7 +239,7 @@ export default function Create() {
                   </select>
                 </form>
               </>
-            )}
+            )} */}
           </>
           <button className="MetButton" onClick={createClaim}>
             {attesting ? "Creating Claim..." : "Generate Claim"}

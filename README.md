@@ -1,5 +1,6 @@
-## Allow Users to Generate and Control Verifiable Credentials and EAS Attestations using Did:PKH
-This application shows how to allow users to create, save, and query AccountTrustClaims (using VCs and Attestations) to ComposeDB using DID:PKH with storage on ComposeDB.
+## Sign Credentials on ComposeDB with Authenticated DIDSession
+
+This application shows how developers can use a simple ComposeDB schema definition and existing native Ceramic utilities to allow their users to sign tamper-evident JWT credentials.
 
 1. Install your dependencies:
 
@@ -19,7 +20,23 @@ To generate your necessary credentials, run the following in your terminal:
 npm run generate
 ```
 
-3. Finally, run your application in a new terminal (first ensure you are running node v16 in your terminal):
+3. Start your IPFS Daemon: 
+
+```bash
+ipfs daemon --enable-pubsub-experiment && ipfs config --json '{
+  "API": {
+    "HTTPHeaders": {
+      "Access-Control-Allow-Origin": [
+        "",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000"
+      ]
+    }
+  }
+}'
+```
+
+4. Finally, run your application in a new terminal (first ensure you are running node v16 in your terminal):
 
 ```bash
 nvm use 16
@@ -28,7 +45,7 @@ npm run dev
 
 If you explore your composedb.config.json and admin_seed.txt files, you will now see a defined JSON ComposeDB server configuration and Ceramic admin seed, respectively.
 
-5. Visit port 3000 in your browser to begin creating both Verifiable Credentials and EAS Attestations while saving them to ComposeDB.
+5. Visit port 3000 in your browser to begin creating credentials
 
 ## Learn More
 
