@@ -23,7 +23,8 @@ npm run generate
 3. Start your IPFS Daemon: 
 
 ```bash
-ipfs daemon --enable-pubsub-experiment && ipfs config --json '{
+ipfs daemon --enable-pubsub-experiment && ipfs config --json 
+'{
   "API": {
     "HTTPHeaders": {
       "Access-Control-Allow-Origin": [
