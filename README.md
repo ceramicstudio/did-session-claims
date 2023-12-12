@@ -20,33 +20,28 @@ To generate your necessary credentials, run the following in your terminal:
 npm run generate
 ```
 
-3. Start your IPFS Daemon: 
+3. Start your IPFS Daemon:
 
 ```bash
-ipfs daemon --enable-pubsub-experiment && ipfs config --json 
-'{
-  "API": {
-    "HTTPHeaders": {
-      "Access-Control-Allow-Origin": [
-        "",
-        "http://127.0.0.1:8080",
-        "http://localhost:3000"
-      ]
-    }
-  }
-}'
+ipfs daemon --enable-pubsub-experiment 
 ```
 
-4. Finally, run your application in a new terminal (first ensure you are running node v16 in your terminal):
+4. In a separate terminal, allow CORS (for local use of this app only):
 
 ```bash
-nvm use 16
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["'"$origin"'", "http://127.0.0.1:8080","http://localhost:3000"]'
+```
+
+5. Finally, run your application in a new terminal (first ensure you are running node v16 in your terminal):
+
+```bash
+nvm use 20
 npm run dev
 ```
 
 If you explore your composedb.config.json and admin_seed.txt files, you will now see a defined JSON ComposeDB server configuration and Ceramic admin seed, respectively.
 
-5. Visit port 3000 in your browser to begin creating credentials
+6. Visit port 3000 in your browser to begin creating credentials
 
 ## Learn More
 
