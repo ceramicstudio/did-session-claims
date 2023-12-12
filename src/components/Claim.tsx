@@ -140,7 +140,7 @@ export default function Create() {
       const newDid = new DID({ resolver: KeyResolver.getResolver() });
       const result = await newDid.verifyJWS(parsed);
       const didFromJwt = result.didResolutionResult?.didDocument?.id;
-
+      console.log('This is the payload: ', result.payload);
       //obtain did:key used to authorize the did-session
       const stream = credential.data.trustIndex.edges[0].node.id;
       const ceramic = new CeramicClient("http://localhost:7007");
