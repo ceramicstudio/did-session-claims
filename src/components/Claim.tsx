@@ -130,7 +130,7 @@ export default function Create() {
         }
       }`
     );
-    console.log(credential.data)
+    console.log(credential.data);
     if (credential.data.trustIndex.edges.length > 0) {
       //obtain did:key used to sign the credential
       const credentialToValidate = credential.data.trustIndex.edges[0].node.jwt;
@@ -141,7 +141,7 @@ export default function Create() {
       const newDid = new DID({ resolver: KeyResolver.getResolver() });
       const result = await newDid.verifyJWS(parsed);
       const didFromJwt = result.didResolutionResult?.didDocument?.id;
-      console.log('This is the payload: ', result.payload);
+      console.log("This is the payload: ", result.payload);
       //obtain did:key used to authorize the did-session
       const stream = credential.data.trustIndex.edges[0].node.id;
       const ceramic = new CeramicClient("http://localhost:7007");
@@ -161,7 +161,12 @@ export default function Create() {
       const didFromDag = res.didResolutionResult?.didDocument?.id;
       console.log(didFromJwt, didFromDag);
       if (didFromJwt === didFromDag) {
-        console.log("Valid");
+        console.log(
+          "Valid: " +
+            didFromJwt +
+            " signed the JWT, and has a DID parent of: " +
+            credential.data.trustIndex.edges[0].node.controller.id
+        );
       } else {
         console.log("Invalid");
       }
