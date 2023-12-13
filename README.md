@@ -32,7 +32,7 @@ ipfs daemon --enable-pubsub-experiment
 ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["'"$origin"'", "http://127.0.0.1:8080","http://localhost:3000"]'
 ```
 
-5. Finally, run your application in a new terminal (first ensure you are running node v16 in your terminal):
+5. Finally, run your application in a new terminal (first ensure you are running node v20 in your terminal):
 
 ```bash
 nvm use 20
