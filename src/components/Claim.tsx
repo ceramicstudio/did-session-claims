@@ -145,7 +145,7 @@ export default function Create() {
       const stream = credential.data.trustIndex.edges[0].node.id;
       const ceramic = new CeramicClient("http://localhost:7007");
       const streamData = await ceramic.loadStreamCommits(stream);
-      const cid: CID | undefined = streamData[0] as CID;
+      const cid: CID | undefined = streamData[streamData.length - 1] as CID;
       //@ts-ignore
       const cidString = cid?.cid;
       const url = `http://localhost:5001/api/v0/dag/get?arg=${cidString}&output-codec=dag-json`;

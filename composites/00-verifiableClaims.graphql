@@ -1,4 +1,4 @@
-## our broading claim type
+## our broadest claim type
 interface VerifiableClaim
   @createModel(description: "A verifiable claim interface") {
   controller: DID! @documentAccount
